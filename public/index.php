@@ -36,7 +36,8 @@ $products = $stmt->fetchAll();
           <th>Supplier Email</th>
           <th>Price</th>
           <th>Created</th>
-          <th>categories</th>
+          <th>Categories</th>
+          <th>Actions</th>
         </tr></thead>
         <tbody>
         <?php foreach ($products as $p): ?>
@@ -44,10 +45,18 @@ $products = $stmt->fetchAll();
             <td><?= htmlspecialchars($p['id']) ?></td>
             <td><?= htmlspecialchars($p['name']) ?></td>
             <td><?= htmlspecialchars($p['description']) ?></td>
-            <td><?= htmlspecialchars($p['supplier_mail'] ?? '—') ?></td>
+            <td><?= htmlspecialchars($p['email'] ?? '—') ?></td>
             <td><?= number_format($p['price'], 2) ?></td>
             <td><?= htmlspecialchars($p['created_at']) ?></td>
             <td><?= htmlspecialchars($p['category_name']) ?></td>
+             <td>
+              <a class="btn btn-sm btn-outline-primary" href="edit.php?id=<?= urlencode($p['id']) ?>">Edit</a>
+
+              <form action="delete.php" method="post" style="display:inline" onsubmit="return confirm('Delete this product?');">
+                <input type="hidden" name="id" value="<?= htmlspecialchars($p['id']) ?>">
+                <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+              </form>
+            </td>
           </tr>
         <?php endforeach; ?>
         </tbody>

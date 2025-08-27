@@ -8,23 +8,30 @@ $name = '';
 $description = '';
 $price = '';
 $email = '';
+$category_id = null;
+
+$catsStmt = $pdo->query("SELECT id, name FROM categories ORDER BY name");
+$categories = $catsStmt->fetchAll();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = $_POST['name'] ?? '';
     $description = $_POST['description'] ?? '';
     $price = $_POST['price'] ?? '';
     $email = $_POST['email'] ?? '';
+    $category_id = $_POST['category_id'] ?? null;
+    if ($category_id === '') $category_id = null;
 
     if ($error = validateRequired($name, "Product Name")) $errors[] = $error;
     if ($error = validateNumeric($price, "Price")) $errors[] = $error;
     if ($error = validateEmail($email)) $errors[] = $error;
 
     if (empty($errors)) {
-        $stmt = $pdo->prepare("INSERT INTO products (name, description, price) VALUES (?, ?, ?)");
-        $stmt->execute([$name, $description, $price]);
+        $stmt = $pdo->prepare("INSERT INTO products (name, description, price, email, category_id) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $description, $price, $email, $category_id]);
 
         $success = "Product created successfully!";
         $name = $description = $price = $email = '';
+        $category_id = null;
     }
 }
 
@@ -70,6 +77,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="mb-3">
             <label class="form-label">Supplier Email (optional)</label>
             <input type="text" name="email" class="form-control" value="<?= htmlspecialchars($email) ?>">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Category</label>
+            <select name="category_id" class="form-select">
+                <option value="">-- Select Category --</option>
+                <?php foreach ($categories as $c): ?>
+                    <option value="<?= $c['id'] ?>" <?= ($category_id == $c['id']) ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($c['name']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
         </div>
 
         <button type="submit" class="btn btn-primary w-100">Create Product</button>
