@@ -1,1 +1,1 @@
-# Training-advanced-PHP---MYSQL
+# Training-advanced-PHP-&-MYSQL
