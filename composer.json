@@ -1,0 +1,17 @@
+{
+    "name": "innofied/php_training",
+    "autoload": {
+        "psr-4": {
+            "Innofied\\PhpTraining\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "sambit-innofied",
+            "email": "sambit.sarkar@innofied.com"
+        }
+    ],
+    "require": {
+        "vlucas/phpdotenv": "^5.6"
+    }
+}
