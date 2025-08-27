@@ -1,0 +1,54 @@
+<?php
+require 'db.php';
+
+$stmt = $pdo -> query ("
+SELECT p.*
+from productt p
+");
+
+$products = $stmt->fetchAll();
+?>
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Products — Home</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-4">
+  <div class="container">
+    <h1 class="mb-4">Products</h1>
+    <p>
+      <a class="btn btn-primary" href="create.php">Add Product</a>
+    </p>
+
+    <?php if (count($products) === 0): ?>
+      <div class="alert alert-info">No products yet.</div>
+    <?php else: ?>
+      <table class="table table-striped">
+        <thead><tr>
+          <th>id</th>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Supplier Email</th>
+          <th>Price</th>
+          <th>Created</th>
+        </tr></thead>
+        <tbody>
+        <?php foreach ($products as $p): ?>
+          <tr>
+            <td><?= htmlspecialchars($p['id']) ?></td>
+            <td><?= htmlspecialchars($p['name']) ?></td>
+            <td><?= htmlspecialchars($p['description']) ?></td>
+            <td><?= htmlspecialchars($p['supplier_mail'] ?? '—') ?></td>
+            <td><?= number_format($p['price'], 2) ?></td>
+            <td><?= htmlspecialchars($p['created_at']) ?></td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+</body>
+</html>
