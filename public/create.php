@@ -1,6 +1,9 @@
 <?php
 require 'db.php';
 require 'validation.php';
+require 'product.php';
+
+$productObj = new Product($pdo);
 
 $errors = [];
 $success = '';
@@ -26,8 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($error = validateEmail($email)) $errors[] = $error;
 
     if (empty($errors)) {
-        $stmt = $pdo->prepare("INSERT INTO products (name, description, price, email, category_id) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $description, $price, $email, $category_id]);
+        $productObj->addProduct($name, $description, $price, $email, $category_id);
 
         $success = "Product created successfully!";
         $name = $description = $price = $email = '';

@@ -1,5 +1,8 @@
 <?php
 require 'db.php';
+require 'product.php';
+
+$productObj = new Product($pdo);
 
 $id = $_GET['id'] ?? null;
 if (!$id) {
@@ -10,9 +13,7 @@ if (!$id) {
 $catsStmt = $pdo->query("SELECT id, name FROM categories ORDER BY name");
 $categories = $catsStmt->fetchAll();
 
-$stmt = $pdo->prepare("SELECT * FROM products WHERE id = ?");
-$stmt->execute([$id]);
-$product = $stmt->fetch();
+$product = $productObj->getProduct($id);
 if (!$product) {
     exit('Product not found.');
 }
