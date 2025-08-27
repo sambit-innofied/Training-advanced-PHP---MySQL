@@ -1,9 +1,11 @@
 <?php
 require 'db.php';
 
-$stmt = $pdo -> query ("
-SELECT p.*
-from productt p
+$stmt = $pdo->query("
+SELECT p.*, c.name AS category_name
+from products p
+left join categories c on p.category_id = c.id
+order by p.created_at DESC
 ");
 
 $products = $stmt->fetchAll();
@@ -34,6 +36,7 @@ $products = $stmt->fetchAll();
           <th>Supplier Email</th>
           <th>Price</th>
           <th>Created</th>
+          <th>categories</th>
         </tr></thead>
         <tbody>
         <?php foreach ($products as $p): ?>
@@ -44,6 +47,7 @@ $products = $stmt->fetchAll();
             <td><?= htmlspecialchars($p['supplier_mail'] ?? '—') ?></td>
             <td><?= number_format($p['price'], 2) ?></td>
             <td><?= htmlspecialchars($p['created_at']) ?></td>
+            <td><?= htmlspecialchars($p['category_name']) ?></td>
           </tr>
         <?php endforeach; ?>
         </tbody>
