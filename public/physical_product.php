@@ -6,12 +6,13 @@ class PhysicalProduct extends Product
     private $weight;
     private $dimensions;
 
+    // Getter and setter 
     public function getWeight() { return $this->weight; }
     public function setWeight($w) { $this->weight = $w; }
-
     public function getDimensions() { return $this->dimensions; }
     public function setDimensions($d) { $this->dimensions = $d; }
 
+    // Insert physical product into database
     public function addProduct()
     {
         $stmt = $this->pdo->prepare("
@@ -29,6 +30,7 @@ class PhysicalProduct extends Product
         ]);
     }
 
+    // Update physical product in database
     public function updateProduct()
     {
         $stmt = $this->pdo->prepare("

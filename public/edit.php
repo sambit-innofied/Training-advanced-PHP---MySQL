@@ -2,17 +2,21 @@
 require 'db.php';
 require 'product.php';
 
+// Initialize Product object
 $productObj = new Product($pdo);
 
+// Get product ID from query, redirect if missing
 $id = $_GET['id'] ?? null;
 if (!$id) {
   header('Location: index.php');
   exit;
 }
 
+// Fetch categories for dropdown
 $catsStmt = $pdo->query("SELECT id, name FROM categories ORDER BY name");
 $categories = $catsStmt->fetchAll();
 
+// Fetch product details
 $product = $productObj->getProduct($id);
 if (!$product) {
   exit('Product not found.');
@@ -20,6 +24,7 @@ if (!$product) {
 
 $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  // Get form values
   $name = trim($_POST['name'] ?? '');
   $description = trim($_POST['description'] ?? '');
   $price = $_POST['price'] ?? '0';
@@ -32,20 +37,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $weight = $_POST['weight'] ?? null;
   $dimensions = $_POST['dimensions'] ?? null;
 
-  if ($category_id === '')
-    $category_id = null;
+  if ($category_id === '') $category_id = null;
 
-  if ($name === '')
-    $errors[] = 'Name is required.';
-  if (!is_numeric($price))
-    $errors[] = 'Price must be numeric.';
-  if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    $errors[] = "Valid email is required.";
-  }
-  if ($type === '') {
-    $errors[] = "Product type is required.";
-  }
+  // Validation
+  if ($name === '') $errors[] = 'Name is required.';
+  if (!is_numeric($price)) $errors[] = 'Price must be numeric.';
+  if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "Valid email is required.";
+  if ($type === '') $errors[] = "Product type is required.";
 
+  // Update product if no errors
   if (empty($errors)) {
     $up = $pdo->prepare("
             UPDATE products 
@@ -71,6 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
   }
 } else {
+  // Pre-fill form with product data
   $_POST = array_merge($_POST, $product);
 }
 ?>
@@ -89,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <h1>Edit Product</h1>
 
     <?php if ($errors): ?>
+      <!-- Display errors -->
       <div class="alert alert-danger">
         <ul><?php foreach ($errors as $e)
           echo "<li>" . htmlspecialchars($e) . "</li>"; ?></ul>
@@ -96,28 +98,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php endif; ?>
 
     <form method="post">
+      <!-- Product name -->
       <div class="mb-3">
         <label class="form-label">Name</label>
         <input name="name" class="form-control" required value="<?= htmlspecialchars($_POST['name'] ?? '') ?>">
       </div>
 
+      <!-- Supplier email -->
       <div class="mb-3">
         <label class="form-label">Supplier Email</label>
         <input type="email" name="email" class="form-control" required
           value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
       </div>
 
+      <!-- Description -->
       <div class="mb-3">
         <label class="form-label">Description</label>
         <textarea name="description"
           class="form-control"><?= htmlspecialchars($_POST['description'] ?? '') ?></textarea>
       </div>
 
+      <!-- Price -->
       <div class="mb-3">
         <label class="form-label">Price</label>
         <input name="price" class="form-control" required value="<?= htmlspecialchars($_POST['price'] ?? '0.00') ?>">
       </div>
 
+      <!-- Category dropdown -->
       <div class="mb-3">
         <label class="form-label">Category</label>
         <select name="category_id" class="form-select">
@@ -130,6 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </select>
       </div>
 
+      <!-- Product type dropdown -->
       <div class="mb-3">
         <label class="form-label">Type *</label>
         <select name="type" id="type" class="form-select" required>
@@ -139,6 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </select>
       </div>
 
+      <!-- Digital fields -->
       <div id="digital-fields" style="display:none;">
         <div class="mb-3">
           <label class="form-label">File Size (MB)</label>
@@ -152,6 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
       </div>
 
+      <!-- Physical fields -->
       <div id="physical-fields" style="display:none;">
         <div class="mb-3">
           <label class="form-label">Weight (kg)</label>
@@ -165,19 +175,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
       </div>
 
+      <!-- Submit & cancel -->
       <button class="btn btn-primary" type="submit">Update</button>
       <a class="btn btn-outline-secondary" href="index.php">Cancel</a>
     </form>
   </div>
 
   <script>
+    // Show/hide fields based on type
     function toggleTypeFields() {
       var val = document.getElementById('type').value;
       document.getElementById('digital-fields').style.display = (val === 'Digital') ? 'block' : 'none';
       document.getElementById('physical-fields').style.display = (val === 'Physical') ? 'block' : 'none';
     }
     document.getElementById('type').addEventListener('change', toggleTypeFields);
-    toggleTypeFields();
+    toggleTypeFields(); // initialize on load
   </script>
 </body>
 

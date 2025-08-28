@@ -2,7 +2,10 @@
 require 'db.php';
 require 'product.php';
 
+// Initialize Product object
 $productObj = new Product($pdo);
+
+// Fetch all products
 $products = $productObj->getAllProducts();
 ?>
 <!DOCTYPE html>
@@ -17,6 +20,7 @@ $products = $productObj->getAllProducts();
 <body class="container py-4">
   <h2 class="mb-4">Product List</h2>
 
+  <!-- Link to add a new product -->
   <a href="create.php" class="btn btn-success mb-3">Add Product</a>
 
   <table class="table table-bordered">
@@ -37,14 +41,17 @@ $products = $productObj->getAllProducts();
       <?php if (count($products) > 0): ?>
         <?php foreach ($products as $product): ?>
           <tr>
+            <!-- Product basic info -->
             <td><?= htmlspecialchars($product['name']) ?></td>
             <td><?= htmlspecialchars($product['description']) ?></td>
             <td><?= htmlspecialchars($product['price']) ?></td>
             <td><?= htmlspecialchars($product['email']) ?></td>
             <td><?= htmlspecialchars($product['category_name']) ?></td>
 
+            <!-- Product type -->
             <td><?= htmlspecialchars(ucfirst($product['type'])) ?></td>
 
+            <!-- Type-specific details -->
             <td>
               <?php if ($product['type'] === 'Digital'): ?>
                 Size: <?= htmlspecialchars($product['file_size']) ?> MB,
@@ -55,10 +62,12 @@ $products = $productObj->getAllProducts();
               <?php else: ?>
                 -
               <?php endif; ?>
-
             </td>
 
+            <!-- Creation date -->
             <td><?= htmlspecialchars($product['created_at']) ?></td>
+
+            <!-- Actions -->
             <td>
               <a href="edit.php?id=<?= $product['id'] ?>" class="btn btn-warning btn-sm">Edit</a>
               <form method="POST" action="delete.php" style="display:inline-block;">

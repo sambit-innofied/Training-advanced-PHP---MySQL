@@ -1,8 +1,10 @@
 <?php
 require 'db.php';
 
+// Product model (represents a product entity)
 class Product
 {
+    // Properties (private = only accessible in this class)
     private $id;
     private $name;
     private $description;
@@ -15,125 +17,52 @@ class Product
     private $weight;
     private $dimensions;
 
+    // DB connection
     protected $pdo;
 
+    // Constructor takes PDO for DB operations
     public function __construct($pdo)
     {
         $this->pdo = $pdo;
     }
 
-    //getters and setters
-    public function getId()
-    {
-        return $this->id;
-    }
+    // Getters & Setters
+    public function getId() { return $this->id; }
+    public function setId($id) { $this->id = $id; }
 
-    public function setId($id)
-    {
-        $this->id = $id;
-    }
+    public function getName() { return $this->name; }
+    public function setName($name) { $this->name = $name; }
 
-    public function getName()
-    {
-        return $this->name;
-    }
+    public function getDescription() { return $this->description; }
+    public function setDescription($description) { $this->description = $description; }
 
-    public function setName($name)
-    {
-        $this->name = $name;
-    }
+    public function getPrice() { return $this->price; }
+    public function setPrice($price) { $this->price = $price; }
 
-    public function getDescription()
-    {
-        return $this->description;
-    }
+    public function getMail() { return $this->email; }
+    public function setMail($email) { $this->email = $email; }
 
-    public function setDescription($description)
-    {
-        $this->description = $description;
-    }
+    public function getCategoryId() { return $this->category_id; }
+    public function setCategoryId($cat) { $this->category_id = $cat; }
 
-    public function getPrice()
-    {
-        return $this->price;
-    }
+    public function getProductType() { return $this->product_type; }
+    public function setProductType($type) { $this->product_type = $type; }
 
-    public function setPrice($price)
-    {
-        $this->price = $price;
-    }
+    public function getFileSize() { return $this->file_size; }
+    public function setFileSize($size) { $this->file_size = $size; }
 
-    public function getMail()
-    {
-        return $this->email;
-    }
+    public function getDownloadLink() { return $this->download_link; }
+    public function setDownloadLink($link) { $this->download_link = $link; }
 
-    public function setMail($email)
-    {
-        $this->email = $email;
-    }
+    public function getWeight() { return $this->weight; }
+    public function setWeight($weight) { $this->weight = $weight; }
 
-    public function getCategoryId()
-    {
-        return $this->category_id;
-    }
+    public function getDimensions() { return $this->dimensions; }
+    public function setDimensions($dim) { $this->dimensions = $dim; }
 
-    public function setCategoryId($cat)
-    {
-        $this->category_id = $cat;
-    }
+    // Database Operations
 
-    public function getProductType()
-    {
-        return $this->product_type;
-    }
-
-    public function setProductType($type)
-    {
-        $this->product_type = $type;
-    }
-
-    public function getFileSize()
-    {
-        return $this->file_size;
-    }
-
-    public function setFileSize($size)
-    {
-        $this->file_size = $size;
-    }
-
-    public function getDownloadLink()
-    {
-        return $this->download_link;
-    }
-
-    public function setDownloadLink($link)
-    {
-        $this->download_link = $link;
-    }
-
-    public function getWeight()
-    {
-        return $this->weight;
-    }
-
-    public function setWeight($weight)
-    {
-        $this->weight = $weight;
-    }
-
-    public function getDimensions()
-    {
-        return $this->dimensions;
-    }
-
-    public function setDimensions($dim)
-    {
-        $this->dimensions = $dim;
-    }
-
-    // database operations 
+    // Insert new product
     public function addProduct()
     {
         $stmt = $this->pdo->prepare("
@@ -155,6 +84,7 @@ class Product
         ]);
     }
 
+    // Update existing product
     public function updateProduct()
     {
         $stmt = $this->pdo->prepare("
@@ -178,18 +108,21 @@ class Product
         ]);
     }
 
+    // Delete product
     public function deleteProduct()
     {
         $stmt = $this->pdo->prepare("DELETE FROM products WHERE id = ?");
         return $stmt->execute([$this->id]);
     }
 
+    // Get single product by ID
     public function getProduct($id)
     {
         $stmt = $this->pdo->prepare("SELECT * FROM products WHERE id = ?");
         $stmt->execute([$id]);
         $data = $stmt->fetch(PDO::FETCH_ASSOC);
 
+        // Fill object with DB data
         if ($data) {
             $this->id = $data['id'];
             $this->name = $data['name'];
@@ -207,19 +140,19 @@ class Product
         return $data;
     }
 
+    // Get all products with category info
     public function getAllProducts()
     {
         $stmt = $this->pdo->query("
-        SELECT p.id, p.name, p.description, p.price, p.email, 
-               p.type, p.created_at, 
-               c.name AS category_name,
-               p.file_size, p.download_link, 
-               p.weight, p.dimensions
-        FROM products p
-        LEFT JOIN categories c ON p.category_id = c.id
-        ORDER BY p.created_at DESC
-    ");
+            SELECT p.id, p.name, p.description, p.price, p.email, 
+                p.type, p.created_at, 
+                c.name AS category_name,
+                p.file_size, p.download_link, 
+                p.weight, p.dimensions
+            FROM products p
+            LEFT JOIN categories c ON p.category_id = c.id
+            ORDER BY p.created_at DESC
+        ");
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
-
 }
