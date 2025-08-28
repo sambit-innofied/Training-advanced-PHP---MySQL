@@ -5,64 +5,76 @@ require 'product.php';
 $productObj = new Product($pdo);
 $products = $productObj->getAllProducts();
 ?>
-
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 
 <head>
-  <meta charset="utf-8">
-  <title>Products — Home</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8">
+  <title>Product List</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
 </head>
 
-<body class="p-4">
-  <div class="container">
-    <h1 class="mb-4">Products</h1>
-    <p>
-      <a class="btn btn-primary" href="create.php">Add Product</a>
-    </p>
+<body class="container py-4">
+  <h2 class="mb-4">Product List</h2>
 
-    <?php if (count($products) === 0): ?>
-      <div class="alert alert-info">No products yet.</div>
-    <?php else: ?>
-      <table class="table table-striped">
-        <thead>
+  <a href="create.php" class="btn btn-success mb-3">Add Product</a>
+
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+        <th>Price</th>
+        <th>Email</th>
+        <th>Category</th>
+        <th>Type</th>
+        <th>Details</th>
+        <th>Created At</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <?php if (count($products) > 0): ?>
+        <?php foreach ($products as $product): ?>
           <tr>
-            <th>id</th>
-            <th>Name</th>
-            <th>Description</th>
-            <th>Supplier Email</th>
-            <th>Price</th>
-            <th>Created</th>
-            <th>Categories</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($products as $p): ?>
-            <tr>
-              <td><?= htmlspecialchars($p['id']) ?></td>
-              <td><?= htmlspecialchars($p['name']) ?></td>
-              <td><?= htmlspecialchars($p['description']) ?></td>
-              <td><?= htmlspecialchars($p['email'] ?? '—') ?></td>
-              <td><?= number_format($p['price'], 2) ?></td>
-              <td><?= htmlspecialchars($p['created_at']) ?></td>
-              <td><?= htmlspecialchars($p['category_name']) ?></td>
-              <td>
-                <a class="btn btn-sm btn-outline-primary" href="edit.php?id=<?= urlencode($p['id']) ?>">Edit</a>
+            <td><?= htmlspecialchars($product['name']) ?></td>
+            <td><?= htmlspecialchars($product['description']) ?></td>
+            <td><?= htmlspecialchars($product['price']) ?></td>
+            <td><?= htmlspecialchars($product['email']) ?></td>
+            <td><?= htmlspecialchars($product['category_name']) ?></td>
 
-                <form action="delete.php" method="post" style="display:inline"
-                  onsubmit="return confirm('Delete this product?');">
-                  <input type="hidden" name="id" value="<?= htmlspecialchars($p['id']) ?>">
-                  <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
-                </form>
-              </td>
-            </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
-    <?php endif; ?>
-  </div>
+            <td><?= htmlspecialchars(ucfirst($product['type'])) ?></td>
+
+            <td>
+              <?php if ($product['type'] === 'Digital'): ?>
+                Size: <?= htmlspecialchars($product['file_size']) ?> MB,
+                Link: <?= htmlspecialchars($product['download_link']) ?>
+              <?php elseif ($product['type'] === 'Physical'): ?>
+                Weight: <?= htmlspecialchars($product['weight']) ?> kg,
+                Dimensions: <?= htmlspecialchars($product['dimensions']) ?>
+              <?php else: ?>
+                -
+              <?php endif; ?>
+
+            </td>
+
+            <td><?= htmlspecialchars($product['created_at']) ?></td>
+            <td>
+              <a href="edit.php?id=<?= $product['id'] ?>" class="btn btn-warning btn-sm">Edit</a>
+              <form method="POST" action="delete.php" style="display:inline-block;">
+                <input type="hidden" name="id" value="<?= $product['id'] ?>">
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+              </form>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      <?php else: ?>
+        <tr>
+          <td colspan="9" class="text-center">No products found</td>
+        </tr>
+      <?php endif; ?>
+    </tbody>
+  </table>
 </body>
 
 </html>
