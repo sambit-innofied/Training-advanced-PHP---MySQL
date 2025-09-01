@@ -1,89 +1,29 @@
 <?php
-require 'db.php';
-require 'product.php';
 
-// Initialize Product object
-$productObj = new Product($pdo);
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 
-// Fetch all products
-$products = $productObj->getAllProducts();
-?>
-<!DOCTYPE html>
-<html lang="en">
+require __DIR__ . '/../vendor/autoload.php';
+require __DIR__ . '/../src/config/db.php';
+require __DIR__ . '/../src/Core/Router.php';
+require __DIR__ . '/../src/controllers/ProductController.php';
 
-<head>
-  <meta charset="UTF-8">
-  <title>Product List</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-</head>
+$GLOBALS['pdo'] = $pdo;
 
-<body class="container py-4">
-  <h2 class="mb-4">Product List</h2>
+$router = new Router();
 
-  <!-- Link to add a new product -->
-  <a href="create.php" class="btn btn-success mb-3">Add Product</a>
+// route: home -> product list
+$router->get('/', function() use ($pdo) {
+    $controller = new ProductController($pdo);
+    $controller->index(); // controller renders the view
+});
 
-  <table class="table table-bordered">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Description</th>
-        <th>Price</th>
-        <th>Email</th>
-        <th>Category</th>
-        <th>Type</th>
-        <th>Details</th>
-        <th>Created At</th>
-        <th>Action</th>
-      </tr>
-    </thead>
-    <tbody>
-      <?php if (count($products) > 0): ?>
-        <?php foreach ($products as $product): ?>
-          <tr>
-            <!-- Product basic info -->
-            <td><?= htmlspecialchars($product['name']) ?></td>
-            <td><?= htmlspecialchars($product['description']) ?></td>
-            <td><?= htmlspecialchars($product['price']) ?></td>
-            <td><?= htmlspecialchars($product['email']) ?></td>
-            <td><?= htmlspecialchars($product['category_name']) ?></td>
+$router->get('/create', 'ProductController@create');
+$router->post('/store', 'ProductController@store');
 
-            <!-- Product type -->
-            <td><?= htmlspecialchars(ucfirst($product['type'])) ?></td>
+$router->get('/edit', 'ProductController@edit');
+$router->post('/update', 'ProductController@update');
 
-            <!-- Type-specific details -->
-            <td>
-              <?php if ($product['type'] === 'Digital'): ?>
-                Size: <?= htmlspecialchars($product['file_size']) ?> MB,
-                Link: <?= htmlspecialchars($product['download_link']) ?>
-              <?php elseif ($product['type'] === 'Physical'): ?>
-                Weight: <?= htmlspecialchars($product['weight']) ?> kg,
-                Dimensions: <?= htmlspecialchars($product['dimensions']) ?>
-              <?php else: ?>
-                -
-              <?php endif; ?>
-            </td>
+$router->post('/delete', 'ProductController@delete');
 
-            <!-- Creation date -->
-            <td><?= htmlspecialchars($product['created_at']) ?></td>
-
-            <!-- Actions -->
-            <td>
-              <a href="edit.php?id=<?= $product['id'] ?>" class="btn btn-warning btn-sm">Edit</a>
-              <form method="POST" action="delete.php" style="display:inline-block;">
-                <input type="hidden" name="id" value="<?= $product['id'] ?>">
-                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-              </form>
-            </td>
-          </tr>
-        <?php endforeach; ?>
-      <?php else: ?>
-        <tr>
-          <td colspan="9" class="text-center">No products found</td>
-        </tr>
-      <?php endif; ?>
-    </tbody>
-  </table>
-</body>
-
-</html>
+$router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);

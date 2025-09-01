@@ -1,8 +1,8 @@
 {
-    "name": "innofied/php_training",
+    "name": "innofied/trainingadvancedphp",
     "autoload": {
         "psr-4": {
-            "Innofied\\PhpTraining\\": "src/"
+            "App\\": "src/"
         }
     },
     "authors": [

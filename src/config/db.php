@@ -1,11 +1,10 @@
 <?php
-// Load Composer autoload (for dotenv and other packages)
-require __DIR__ . '/../vendor/autoload.php';
+// Load Composer autoload
+require __DIR__ . '/../../vendor/autoload.php';
 
 use Dotenv\Dotenv;
 
-// Load environment variables from .env file
-$dotenv = Dotenv::createImmutable(__DIR__ . "/..");
+$dotenv = Dotenv::createImmutable(__DIR__ . "/../../");
 $dotenv->load();
 
 // Database config from .env
@@ -29,6 +28,6 @@ try {
     // Create PDO instance (connect to DB)
     $pdo = new PDO($dsn, $user, $password, $options);
 } catch (PDOException $e) {
-    // Exit if connection fails
+    // Exit if connection failssr
     exit('Database connection failed' . $e->getMessage());
 }
