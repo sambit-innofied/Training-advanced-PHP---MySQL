@@ -7,23 +7,61 @@ require __DIR__ . '/../vendor/autoload.php';
 require __DIR__ . '/../src/config/db.php';
 require __DIR__ . '/../src/Core/Router.php';
 require __DIR__ . '/../src/controllers/ProductController.php';
+require __DIR__ . '/../src/controllers/AuthController.php';
+require __DIR__ . '/../src/helpers/auth.php'; // Add the auth helper
 
 $GLOBALS['pdo'] = $pdo;
 
 $router = new Router();
 
-// route: home -> product list
-$router->get('/', function() use ($pdo) {
-    $controller = new ProductController($pdo);
-    $controller->index(); // controller renders the view
+// Auth routes (public)
+$router->get('/login', 'AuthController@login');
+$router->post('/authenticate', 'AuthController@authenticate');
+$router->get('/register', 'AuthController@register');
+$router->post('/store-user', 'AuthController@storeUser');
+$router->post('/logout', 'AuthController@logout');
+
+// Protected routes - all require authentication
+$router->get('/', function () use ($pdo) {
+  requireAuth();
+
+  $controller = new ProductController($pdo);
+  $controller->index();
 });
 
-$router->get('/create', 'ProductController@create');
-$router->post('/store', 'ProductController@store');
+$router->get('/create', function () use ($pdo) {
+  requireAuth();
 
-$router->get('/edit', 'ProductController@edit');
-$router->post('/update', 'ProductController@update');
+  $controller = new ProductController($pdo);
+  $controller->create();
+});
 
-$router->post('/delete', 'ProductController@delete');
+$router->post('/store', function () use ($pdo) {
+  requireAuth();
+
+  $controller = new ProductController($pdo);
+  $controller->store();
+});
+
+$router->get('/edit', function () use ($pdo) {
+  requireAuth();
+
+  $controller = new ProductController($pdo);
+  $controller->edit();
+});
+
+$router->post('/update', function () use ($pdo) {
+  requireAuth();
+
+  $controller = new ProductController($pdo);
+  $controller->update();
+});
+
+$router->post('/delete', function () use ($pdo) {
+  requireAuth();
+
+  $controller = new ProductController($pdo);
+  $controller->delete();
+});
 
 $router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
