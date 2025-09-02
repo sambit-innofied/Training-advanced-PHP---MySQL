@@ -1,5 +1,6 @@
 <?php
 
+//to show errors in the browser.
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
@@ -8,7 +9,7 @@ require __DIR__ . '/../src/config/db.php';
 require __DIR__ . '/../src/Core/Router.php';
 require __DIR__ . '/../src/controllers/ProductController.php';
 require __DIR__ . '/../src/controllers/AuthController.php';
-require __DIR__ . '/../src/helpers/auth.php'; // Add the auth helper
+require __DIR__ . '/../src/helpers/auth.php';
 
 $GLOBALS['pdo'] = $pdo;
 
@@ -30,35 +31,35 @@ $router->get('/', function () use ($pdo) {
 });
 
 $router->get('/create', function () use ($pdo) {
-  requireAuth();
+  requireAdmin();
 
   $controller = new ProductController($pdo);
   $controller->create();
 });
 
 $router->post('/store', function () use ($pdo) {
-  requireAuth();
+  requireAdmin();
 
   $controller = new ProductController($pdo);
   $controller->store();
 });
 
 $router->get('/edit', function () use ($pdo) {
-  requireAuth();
+  requireAdmin();
 
   $controller = new ProductController($pdo);
   $controller->edit();
 });
 
 $router->post('/update', function () use ($pdo) {
-  requireAuth();
+  requireAdmin();
 
   $controller = new ProductController($pdo);
   $controller->update();
 });
 
 $router->post('/delete', function () use ($pdo) {
-  requireAuth();
+  requireAdmin();
 
   $controller = new ProductController($pdo);
   $controller->delete();

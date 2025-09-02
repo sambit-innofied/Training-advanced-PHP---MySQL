@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../models/ProductModel.php';
+require_once __DIR__ . '/../validation/ProductValidator.php';
 
 class ProductController
 {
@@ -14,14 +15,17 @@ class ProductController
     public function index()
     {
         $sql = "
-            SELECT p.id, p.name, p.price, p.type, p.category_id, c.name AS category_name
-            FROM products p
-            LEFT JOIN categories c ON p.category_id = c.id
-            ORDER BY p.id DESC
+        SELECT p.id, p.name, p.price, p.type, p.category_id, c.name AS category_name
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        ORDER BY p.id DESC
         ";
 
         $stmt = $this->pdo->query($sql);
         $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Check if user is admin
+        isAdmin();
 
         include __DIR__ . '/../views/products/index.php';
     }
@@ -40,74 +44,34 @@ class ProductController
     // Handle POST request and insert product + subtype row
     public function store()
     {
-        // Basic validation & sanitization
-        $name = trim($_POST['name'] ?? '');
-        $price = $_POST['price'] ?? '';
-        $type = $_POST['type'] ?? '';
-        $category_id = $_POST['category_id'] ?? null;
+        // Validate the input using static method
+        $errors = ProductValidator::validate($this->pdo, $_POST);
 
-        $errors = [];
-        $old = ['name' => $name, 'price' => $price, 'type' => $type, 'category_id' => $category_id];
-
-        if ($name === '') {
-            $errors['name'] = 'Name is required.';
-        }
-
-        if ($price === '' || !is_numeric($price) || (float) $price < 0) {
-            $errors['price'] = 'Price must be a non-negative number.';
-        } else {
-            $price = number_format((float) $price, 2, '.', '');
-        }
-
-        if (!in_array($type, ['physical', 'digital'], true)) {
-            $errors['type'] = 'Invalid product type.';
-        }
-
-        // category must exist and match the product type
-        $catStmt = $this->pdo->prepare("SELECT id, type FROM categories WHERE id = ? LIMIT 1");
-        $catStmt->execute([$category_id]);
-        $category = $catStmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$category) {
-            $errors['category_id'] = 'Selected category does not exist.';
-        } elseif ($category['type'] !== $type) {
-            $errors['category_id'] = 'Selected category type does not match product type.';
-        }
-
-        // subtype fields
-        if ($type === 'physical') {
-            $weight = trim($_POST['weight'] ?? '');
-            $dimensions = trim($_POST['dimensions'] ?? '');
-
-            if ($weight === '' || !is_numeric($weight) || (float) $weight <= 0) {
-                $errors['weight'] = 'Weight must be a positive number.';
-            }
-
-            if ($dimensions === '') {
-                $errors['dimensions'] = 'Dimensions are required.';
-            }
-
-            $old['weight'] = $weight;
-            $old['dimensions'] = $dimensions;
-        } else { // digital
-            $file_size = trim($_POST['file_size'] ?? '');
-            $download_url = trim($_POST['download_url'] ?? '');
-
-            if ($file_size === '' || !is_numeric($file_size) || (float) $file_size <= 0) {
-                $errors['file_size'] = 'File size must be a positive number (MB).';
-            }
-
-            if ($download_url === '') {
-                $errors['download_url'] = 'Please enter a valid download URL.';
-            }
-
-            $old['file_size'] = $file_size;
-            $old['download_url'] = $download_url;
-        }
-
-        // If validation fails, re-render create form with errors and old values
         if (!empty($errors)) {
-            return $this->create($errors, $old);
+            return $this->create($errors, $_POST);
+        }
+
+        // Prepare data for insertion
+        $name = trim($_POST['name']);
+        $price = number_format((float) $_POST['price'], 2, '.', '');
+        $type = $_POST['type'];
+        $category_id = $_POST['category_id'];
+
+        // Prepare old data for potential error handling
+        $old = [
+            'name' => $name,
+            'price' => $price,
+            'type' => $type,
+            'category_id' => $category_id
+        ];
+
+        // Add subtype data to old array
+        if ($type === 'physical') {
+            $old['weight'] = trim($_POST['weight']);
+            $old['dimensions'] = trim($_POST['dimensions']);
+        } else {
+            $old['file_size'] = trim($_POST['file_size']);
+            $old['download_url'] = trim($_POST['download_url']);
         }
 
         // Insert into DB inside a transaction
@@ -233,143 +197,138 @@ class ProductController
         }
         $id = (int) $id_raw;
 
+        // Validate the input using static method
+        $errors = ProductValidator::validate($this->pdo, $_POST);
 
-        // read inputs
-        $name = trim($_POST['name'] ?? '');
-        $price = $_POST['price'] ?? '';
-        $type = $_POST['type'] ?? '';
-        $category_id_raw = $_POST['category_id'] ?? null;
-
-
-        $errors = [];
-        $old = ['id' => $id, 'name' => $name, 'price' => $price, 'type' => $type, 'category_id' => $category_id_raw];
-
-
-        if ($name === '') {
-            $errors['name'] = 'Name is required.';
-        }
-
-
-        if ($price === '' || !is_numeric($price) || (float) $price < 0) {
-            $errors['price'] = 'Price must be a non-negative number.';
-        } else {
-            $price = number_format((float) $price, 2, '.', '');
-            $old['price'] = $price;
-        }
-
-
-        if (!in_array($type, ['physical', 'digital'], true)) {
-            $errors['type'] = 'Invalid product type.';
-        }
-
-
-        // category validation
-        $category_id = null;
-        if ($category_id_raw !== null && $category_id_raw !== '') {
-            if (!is_numeric($category_id_raw) || (int) $category_id_raw <= 0) {
-                $errors['category_id'] = 'Invalid category selected.';
-            } else {
-                $category_id = (int) $category_id_raw;
-                $old['category_id'] = $category_id;
-            }
-        } else {
-            $errors['category_id'] = 'Please choose a category.';
-        }
-
-
-        if (empty($errors)) {
-            $catStmt = $this->pdo->prepare("SELECT id, type FROM categories WHERE id = ? LIMIT 1");
-            $catStmt->execute([$category_id]);
-            $category = $catStmt->fetch(PDO::FETCH_ASSOC);
-
-
-            if (!$category) {
-                $errors['category_id'] = 'Selected category does not exist.';
-            } elseif ($category['type'] !== $type) {
-                $errors['category_id'] = 'Selected category type does not match product type.';
-            }
-        }
-
-
-        // subtype fields validation
-        if ($type === 'physical') {
-            $weight = trim($_POST['weight'] ?? '');
-            $dimensions = trim($_POST['dimensions'] ?? '');
-
-
-            if ($weight === '' || !is_numeric($weight) || (float) $weight <= 0) {
-                $errors['weight'] = 'Weight must be a positive number.';
-            }
-            if ($dimensions === '') {
-                $errors['dimensions'] = 'Dimensions are required.';
-            }
-            $old['weight'] = $weight;
-            $old['dimensions'] = $dimensions;
-        } else { // digital
-            $file_size = trim($_POST['file_size'] ?? '');
-            $download_url = trim($_POST['download_url'] ?? '');
-
-
-            if ($file_size === '' || !is_numeric($file_size) || (float) $file_size <= 0) {
-                $errors['file_size'] = 'File size must be a positive number (MB).';
-            }
-            if ($download_url === '') {
-                $errors['download_url'] = 'Please enter a valid download URL.';
-            }
-            $old['file_size'] = $file_size;
-            $old['download_url'] = $download_url;
-        }
-
-
-        // if validation fails -> re-render edit form
         if (!empty($errors)) {
-            // load categories for the form
+            // Fetch the product and its subtype data to populate the form
+            $stmt = $this->pdo->prepare("SELECT * FROM products WHERE id = ? LIMIT 1");
+            $stmt->execute([$id]);
+            $product = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$product) {
+                header('Location: /');
+                exit;
+            }
+
+            // Build old values to populate the form
+            $old = [
+                'id' => $id,
+                'name' => $_POST['name'] ?? $product['name'],
+                'price' => $_POST['price'] ?? $product['price'],
+                'type' => $_POST['type'] ?? $product['type'],
+                'category_id' => $_POST['category_id'] ?? $product['category_id']
+            ];
+
+            // Add subtype fields
+            if (($product['type'] ?? '') === 'physical') {
+                $s = $this->pdo->prepare("SELECT weight, dimensions FROM physical_product WHERE product_id = ? LIMIT 1");
+                $s->execute([$id]);
+                $sub = $s->fetch(PDO::FETCH_ASSOC);
+                if ($sub) {
+                    $old['weight'] = $_POST['weight'] ?? $sub['weight'];
+                    $old['dimensions'] = $_POST['dimensions'] ?? $sub['dimensions'];
+                }
+            } else {
+                $s = $this->pdo->prepare("SELECT file_size, download_url FROM digital_product WHERE product_id = ? LIMIT 1");
+                $s->execute([$id]);
+                $sub = $s->fetch(PDO::FETCH_ASSOC);
+                if ($sub) {
+                    $old['file_size'] = $_POST['file_size'] ?? $sub['file_size'];
+                    $old['download_url'] = $_POST['download_url'] ?? $sub['download_url'];
+                }
+            }
+
+            // Load categories for the form
             $stmt = $this->pdo->query("SELECT id, name, type FROM categories ORDER BY name");
             $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Re-render the edit form with errors and old values
             include __DIR__ . '/../views/products/edit.php';
             return;
         }
 
+        // If validation passes, process the update
+        $name = trim($_POST['name']);
+        $price = number_format((float) $_POST['price'], 2, '.', '');
+        $type = $_POST['type'];
+        $category_id = (int) $_POST['category_id'];
 
-        // perform update inside transaction
+        // Prepare data for transaction
+        $updateData = [
+            'name' => $name,
+            'price' => $price,
+            'type' => $type,
+            'category_id' => $category_id,
+            'id' => $id
+        ];
+
+        // Add subtype data
+        if ($type === 'physical') {
+            $updateData['weight'] = trim($_POST['weight']);
+            $updateData['dimensions'] = trim($_POST['dimensions']);
+        } else {
+            $updateData['file_size'] = trim($_POST['file_size']);
+            $updateData['download_url'] = trim($_POST['download_url']);
+        }
+
+        // Perform update inside transaction
         try {
             $this->pdo->beginTransaction();
 
-
-            // update products table
+            // Update products table
             $update = $this->pdo->prepare("UPDATE products SET name = ?, price = ?, type = ?, category_id = ? WHERE id = ?");
             $update->execute([$name, $price, $type, $category_id, $id]);
 
-
-            // remove any existing subtype rows (simple approach)
+            // Remove any existing subtype rows
             $delP = $this->pdo->prepare("DELETE FROM physical_product WHERE product_id = ?");
             $delP->execute([$id]);
-
 
             $delD = $this->pdo->prepare("DELETE FROM digital_product WHERE product_id = ?");
             $delD->execute([$id]);
 
-
-            // insert new subtype row
+            // Insert new subtype row
             if ($type === 'physical') {
                 $insertP = $this->pdo->prepare("INSERT INTO physical_product (product_id, weight, dimensions) VALUES (?, ?, ?)");
-                $insertP->execute([$id, $old['weight'], $old['dimensions']]);
+                $insertP->execute([$id, $updateData['weight'], $updateData['dimensions']]);
             } else {
                 $insertD = $this->pdo->prepare("INSERT INTO digital_product (product_id, file_size, download_url) VALUES (?, ?, ?)");
-                $insertD->execute([$id, $old['file_size'], $old['download_url']]);
+                $insertD->execute([$id, $updateData['file_size'], $updateData['download_url']]);
             }
-
 
             $this->pdo->commit();
 
-
+            // Redirect to product list on success
             header('Location: /');
             exit;
         } catch (Exception $e) {
             $this->pdo->rollBack();
+
+            // Prepare data for error display
+            $old = [
+                'id' => $id,
+                'name' => $name,
+                'price' => $price,
+                'type' => $type,
+                'category_id' => $category_id
+            ];
+
+            // Add subtype data
+            if ($type === 'physical') {
+                $old['weight'] = $updateData['weight'];
+                $old['dimensions'] = $updateData['dimensions'];
+            } else {
+                $old['file_size'] = $updateData['file_size'];
+                $old['download_url'] = $updateData['download_url'];
+            }
+
+            // Show error in form
             $errors['database'] = 'Failed to update product: ' . $e->getMessage();
+
+            // Load categories for the form
             $stmt = $this->pdo->query("SELECT id, name, type FROM categories ORDER BY name");
             $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
             include __DIR__ . '/../views/products/edit.php';
             return;
         }
