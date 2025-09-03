@@ -1,12 +1,16 @@
 <?php
 
+require_once __DIR__ . '/../models/UserModel.php';
+
 class AuthController
 {
     protected $pdo;
+    protected $userModel;
 
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
+        $this->userModel = new UserModel($pdo);
     }
 
     // Show login form
@@ -46,10 +50,8 @@ class AuthController
             exit;
         }
 
-        // Check user credentials
-        $stmt = $this->pdo->prepare("SELECT id, username, password_hash, role FROM users WHERE username = ?");
-        $stmt->execute([$username]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        // Check user credentials via model
+        $user = $this->userModel->findByUsername($username);
 
         if ($user && password_verify($password, $user['password_hash'])) {
             // Set session variables
@@ -135,13 +137,11 @@ class AuthController
             $errors['password_confirm'] = 'Passwords do not match.';
         }
 
-        // Check if username or email already exists
-        $stmt = $this->pdo->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
-        $stmt->execute([$username, $email]);
-        $existingUser = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($existingUser) {
-            $errors['general'] = 'Username or email already exists.';
+        // Check if username or email already exists via model
+        if (!$errors) {
+            if ($this->userModel->existsByUsernameOrEmail($username, $email)) {
+                $errors['general'] = 'Username or email already exists.';
+            }
         }
 
         if (!empty($errors)) {
@@ -151,15 +151,21 @@ class AuthController
             exit;
         }
 
-        // Hash password and create user
+        // Hash password and create user using model
         $password_hash = password_hash($password, PASSWORD_DEFAULT);
         $defaultRole = 'customer';
-        $stmt = $this->pdo->prepare("INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)");
-        $stmt->execute([$username, $email, $password_hash, $defaultRole]);
+
+        try {
+            $user_id = $this->userModel->create($username, $email, $password_hash, $defaultRole);
+        } catch (Exception $e) {
+            // If DB error occurs, show generic message (preserve behavior)
+            $_SESSION['register_errors'] = ['general' => 'Failed to create user: ' . $e->getMessage()];
+            $_SESSION['register_old'] = $old;
+            header('Location: /register');
+            exit;
+        }
 
         // Automatically log in the user after registration
-        $user_id = $this->pdo->lastInsertId();
-
         $_SESSION['user_id'] = $user_id;
         $_SESSION['username'] = $username;
         $_SESSION['logged_in'] = true;
