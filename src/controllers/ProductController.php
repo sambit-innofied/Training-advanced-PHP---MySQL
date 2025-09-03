@@ -5,24 +5,18 @@ require_once __DIR__ . '/../validation/ProductValidator.php';
 class ProductController
 {
     protected $pdo;
+    protected $productModel;
 
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
+        $this->productModel = new ProductModel($pdo);
     }
 
-    // get all products and render view 
+    //Get all products (index)
     public function index()
     {
-        $sql = "
-        SELECT p.id, p.name, p.price, p.type, p.category_id, c.name AS category_name
-        FROM products p
-        LEFT JOIN categories c ON p.category_id = c.id
-        ORDER BY p.id DESC
-        ";
-
-        $stmt = $this->pdo->query($sql);
-        $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $products = $this->productModel->all();
 
         // Check if user is admin
         isAdmin();
@@ -33,18 +27,14 @@ class ProductController
     // Render the create product form
     public function create(array $errors = [], array $old = [])
     {
-        // load categories so the form can show them
-        $stmt = $this->pdo->query("SELECT id, name, type FROM categories ORDER BY name");
-        $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $categories = $this->productModel->categories();
 
-        // view expects $categories, $errors, $old
         include __DIR__ . '/../views/products/create.php';
     }
 
     // Handle POST request and insert product + subtype row
     public function store()
     {
-        // Validate the input using static method
         $errors = ProductValidator::validate($this->pdo, $_POST);
 
         if (!empty($errors)) {
@@ -74,53 +64,15 @@ class ProductController
             $old['download_url'] = trim($_POST['download_url']);
         }
 
-        // Insert into DB inside a transaction
+        // Prepare data array for model
+        $data = array_merge($old, ['name' => $name, 'price' => $price, 'type' => $type, 'category_id' => $category_id]);
+
         try {
-            $this->pdo->beginTransaction();
+            $this->productModel->create($data);
 
-            $insertProduct = $this->pdo->prepare("
-                INSERT INTO products (name, price, type, category_id)
-                VALUES (:name, :price, :type, :category_id)
-            ");
-            $insertProduct->execute([
-                ':name' => $name,
-                ':price' => $price,
-                ':type' => $type,
-                ':category_id' => $category_id
-            ]);
-
-            $productId = $this->pdo->lastInsertId();
-
-            if ($type === 'physical') {
-                $insertPhysical = $this->pdo->prepare("
-                    INSERT INTO physical_product (product_id, weight, dimensions)
-                    VALUES (:product_id, :weight, :dimensions)
-                ");
-                $insertPhysical->execute([
-                    ':product_id' => $productId,
-                    ':weight' => $old['weight'],
-                    ':dimensions' => $old['dimensions']
-                ]);
-            } else {
-                $insertDigital = $this->pdo->prepare("
-                    INSERT INTO digital_product (product_id, file_size, download_url)
-                    VALUES (:product_id, :file_size, :download_url)
-                ");
-                $insertDigital->execute([
-                    ':product_id' => $productId,
-                    ':file_size' => $old['file_size'],
-                    ':download_url' => $old['download_url']
-                ]);
-            }
-
-            $this->pdo->commit();
-
-            // success -> redirect to product list
             header('Location: /');
             exit;
         } catch (Exception $e) {
-            $this->pdo->rollBack();
-            // show error in form
             $errors['database'] = 'Failed to save product: ' . $e->getMessage();
             return $this->create($errors, $old);
         }
@@ -135,18 +87,13 @@ class ProductController
         }
         $id = (int) $id;
 
-
         // fetch product
-        $stmt = $this->pdo->prepare("SELECT * FROM products WHERE id = ? LIMIT 1");
-        $stmt->execute([$id]);
-        $product = $stmt->fetch(PDO::FETCH_ASSOC);
-
+        $product = $this->productModel->find($id);
 
         if (!$product) {
             header('Location: /');
             exit;
         }
-
 
         // build old values to populate the form
         $old = [
@@ -157,31 +104,20 @@ class ProductController
             'category_id' => $product['category_id']
         ];
 
-
         // fetch subtype fields
-        if ($product['type'] === 'physical') {
-            $s = $this->pdo->prepare("SELECT weight, dimensions FROM physical_product WHERE product_id = ? LIMIT 1");
-            $s->execute([$id]);
-            $sub = $s->fetch(PDO::FETCH_ASSOC);
-            if ($sub) {
+        $sub = $this->productModel->getSubtype($id, $product['type']);
+        if (!empty($sub)) {
+            if ($product['type'] === 'physical') {
                 $old['weight'] = $sub['weight'];
                 $old['dimensions'] = $sub['dimensions'];
-            }
-        } else {
-            $s = $this->pdo->prepare("SELECT file_size, download_url FROM digital_product WHERE product_id = ? LIMIT 1");
-            $s->execute([$id]);
-            $sub = $s->fetch(PDO::FETCH_ASSOC);
-            if ($sub) {
+            } else {
                 $old['file_size'] = $sub['file_size'];
                 $old['download_url'] = $sub['download_url'];
             }
         }
 
-
         // load categories
-        $stmt = $this->pdo->query("SELECT id, name, type FROM categories ORDER BY name");
-        $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
+        $categories = $this->productModel->categories();
 
         $errors = [];
         include __DIR__ . '/../views/products/edit.php';
@@ -202,9 +138,7 @@ class ProductController
 
         if (!empty($errors)) {
             // Fetch the product and its subtype data to populate the form
-            $stmt = $this->pdo->prepare("SELECT * FROM products WHERE id = ? LIMIT 1");
-            $stmt->execute([$id]);
-            $product = $stmt->fetch(PDO::FETCH_ASSOC);
+            $product = $this->productModel->find($id);
 
             if (!$product) {
                 header('Location: /');
@@ -220,28 +154,20 @@ class ProductController
                 'category_id' => $_POST['category_id'] ?? $product['category_id']
             ];
 
-            // Add subtype fields
-            if (($product['type'] ?? '') === 'physical') {
-                $s = $this->pdo->prepare("SELECT weight, dimensions FROM physical_product WHERE product_id = ? LIMIT 1");
-                $s->execute([$id]);
-                $sub = $s->fetch(PDO::FETCH_ASSOC);
-                if ($sub) {
+            // Add subtype fields (read from DB if not present in POST)
+            $sub = $this->productModel->getSubtype($id, $product['type']);
+            if (!empty($sub)) {
+                if (($product['type'] ?? '') === 'physical') {
                     $old['weight'] = $_POST['weight'] ?? $sub['weight'];
                     $old['dimensions'] = $_POST['dimensions'] ?? $sub['dimensions'];
-                }
-            } else {
-                $s = $this->pdo->prepare("SELECT file_size, download_url FROM digital_product WHERE product_id = ? LIMIT 1");
-                $s->execute([$id]);
-                $sub = $s->fetch(PDO::FETCH_ASSOC);
-                if ($sub) {
+                } else {
                     $old['file_size'] = $_POST['file_size'] ?? $sub['file_size'];
                     $old['download_url'] = $_POST['download_url'] ?? $sub['download_url'];
                 }
             }
 
             // Load categories for the form
-            $stmt = $this->pdo->query("SELECT id, name, type FROM categories ORDER BY name");
-            $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $categories = $this->productModel->categories();
 
             // Re-render the edit form with errors and old values
             include __DIR__ . '/../views/products/edit.php';
@@ -272,38 +198,12 @@ class ProductController
             $updateData['download_url'] = trim($_POST['download_url']);
         }
 
-        // Perform update inside transaction
         try {
-            $this->pdo->beginTransaction();
+            $this->productModel->update($id, $updateData);
 
-            // Update products table
-            $update = $this->pdo->prepare("UPDATE products SET name = ?, price = ?, type = ?, category_id = ? WHERE id = ?");
-            $update->execute([$name, $price, $type, $category_id, $id]);
-
-            // Remove any existing subtype rows
-            $delP = $this->pdo->prepare("DELETE FROM physical_product WHERE product_id = ?");
-            $delP->execute([$id]);
-
-            $delD = $this->pdo->prepare("DELETE FROM digital_product WHERE product_id = ?");
-            $delD->execute([$id]);
-
-            // Insert new subtype row
-            if ($type === 'physical') {
-                $insertP = $this->pdo->prepare("INSERT INTO physical_product (product_id, weight, dimensions) VALUES (?, ?, ?)");
-                $insertP->execute([$id, $updateData['weight'], $updateData['dimensions']]);
-            } else {
-                $insertD = $this->pdo->prepare("INSERT INTO digital_product (product_id, file_size, download_url) VALUES (?, ?, ?)");
-                $insertD->execute([$id, $updateData['file_size'], $updateData['download_url']]);
-            }
-
-            $this->pdo->commit();
-
-            // Redirect to product list on success
             header('Location: /');
             exit;
         } catch (Exception $e) {
-            $this->pdo->rollBack();
-
             // Prepare data for error display
             $old = [
                 'id' => $id,
@@ -326,8 +226,7 @@ class ProductController
             $errors['database'] = 'Failed to update product: ' . $e->getMessage();
 
             // Load categories for the form
-            $stmt = $this->pdo->query("SELECT id, name, type FROM categories ORDER BY name");
-            $categories = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $categories = $this->productModel->categories();
 
             include __DIR__ . '/../views/products/edit.php';
             return;
@@ -343,26 +242,11 @@ class ProductController
         }
         $id = (int) $id;
 
-
         try {
-            $this->pdo->beginTransaction();
-            $delPhysical = $this->pdo->prepare("DELETE FROM physical_product WHERE product_id = ?");
-            $delPhysical->execute([$id]);
-
-
-            $delDigital = $this->pdo->prepare("DELETE FROM digital_product WHERE product_id = ?");
-            $delDigital->execute([$id]);
-
-
-            $delProduct = $this->pdo->prepare("DELETE FROM products WHERE id = ?");
-            $delProduct->execute([$id]);
-
-
-            $this->pdo->commit();
+            $this->productModel->delete($id);
         } catch (Exception $e) {
-            $this->pdo->rollBack();
+            // ignore - keep same behaviour as before
         }
-
 
         header('Location: /');
         exit;
