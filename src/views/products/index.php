@@ -1,22 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Product List</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
 </head>
+
 <body class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-4">
     <h2>Product List</h2>
     <div>
       <?php if (isset($_SESSION['username'])): ?>
-        <span class="me-3">Welcome, <?= htmlspecialchars($_SESSION['username']) ?> 
+        <span class="me-3">Welcome, <?= htmlspecialchars($_SESSION['username']) ?>
           (<?= htmlspecialchars($_SESSION['role'] ?? 'customer') ?>)</span>
-        
+
         <?php if (isAdmin()): ?>
           <a href="/create" class="btn btn-success btn-sm me-2">Add Product</a>
         <?php endif; ?>
-        
+
         <form method="POST" action="/logout" style="display:inline-block;">
           <button type="submit" class="btn btn-outline-secondary btn-sm">Logout</button>
         </form>
@@ -48,14 +50,25 @@
             <td><?= htmlspecialchars($product['name']) ?></td>
             <td><?= htmlspecialchars($product['price']) ?></td>
             <td><?= htmlspecialchars($product['type']) ?></td>
-            <td><?= htmlspecialchars($product['category_name'] ?? '') ?></td>
+            <td><?= htmlspecialchars(string: $product['category_name'] ?? '') ?></td>
+
+            <td>
+              <form method="post" action="/cart/add" style="display:inline-block;">
+                <input type="hidden" name="product_id" value="<?= $product['id'] ?>">
+                <input type="hidden" name="quantity" value="1">
+                <button class="btn btn-sm btn-primary" type="submit">Add to cart</button>
+              </form>
+            </td>
+
             <?php if (isAdmin()): ?>
               <td>
                 <a href="/edit?id=<?= $product['id'] ?>" class="btn btn-warning btn-sm">Edit</a>
                 <form method="POST" action="/delete" style="display:inline-block;">
                   <input type="hidden" name="id" value="<?= $product['id'] ?>">
-                  <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete this product?')">Delete</button>
+                  <button type="submit" class="btn btn-danger btn-sm"
+                    onclick="return confirm('Are you sure you want to delete this product?')">Delete</button>
                 </form>
+
               </td>
             <?php endif; ?>
           </tr>
@@ -68,4 +81,5 @@
     </tbody>
   </table>
 </body>
+
 </html>

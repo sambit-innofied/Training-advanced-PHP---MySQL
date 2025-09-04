@@ -10,6 +10,8 @@ require __DIR__ . '/../src/Core/Router.php';
 require __DIR__ . '/../src/controllers/ProductController.php';
 require __DIR__ . '/../src/controllers/AuthController.php';
 require __DIR__ . '/../src/helpers/auth.php';
+require __DIR__ . '/../src/controllers/CartController.php';
+
 
 $GLOBALS['pdo'] = $pdo;
 
@@ -64,5 +66,22 @@ $router->post('/delete', function () use ($pdo) {
   $controller = new ProductController($pdo);
   $controller->delete();
 });
+
+
+//Cart routes (public)
+$router->get('/cart', 'CartController@index');
+$router->post('/cart/add', 'CartController@add');
+$router->post('/cart/update', 'CartController@update');
+$router->post('/cart/delete', 'CartController@delete');
+$router->get('/checkout', 'CartController@checkout');
+$router->post('/checkout', 'CartController@placeOrder');
+
+// create stripe checkout session (called via JS)
+$router->post('/create-checkout-session', 'CartController@createCheckoutSession');
+
+// stripe redirect landing pages
+$router->get('/payment/success', 'CartController@paymentSuccess');
+$router->get('/payment/cancel', 'CartController@paymentCancel');
+
 
 $router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
