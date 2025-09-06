@@ -67,7 +67,6 @@ $router->post('/delete', function () use ($pdo) {
   $controller->delete();
 });
 
-
 //Cart routes (public)
 $router->get('/cart', 'CartController@index');
 $router->post('/cart/add', 'CartController@add');

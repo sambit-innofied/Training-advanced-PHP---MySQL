@@ -17,7 +17,6 @@ class DigitalProductModel extends ProductModel
         return $this;
     }
 
-    
     public function getDownloadUrl()
     {
         return $this->download_url;
