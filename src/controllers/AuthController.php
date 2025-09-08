@@ -57,7 +57,7 @@ class AuthController
             // Set session variables
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
-            $_SESSION['username'] = $user['email'];
+            $_SESSION['email'] = $user['email'];
             $_SESSION['role'] = $user['role']; // Store the role
             $_SESSION['logged_in'] = true;
 

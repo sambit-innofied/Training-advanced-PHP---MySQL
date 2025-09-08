@@ -11,6 +11,7 @@ require __DIR__ . '/../src/controllers/ProductController.php';
 require __DIR__ . '/../src/controllers/AuthController.php';
 require __DIR__ . '/../src/helpers/auth.php';
 require __DIR__ . '/../src/controllers/CartController.php';
+require __DIR__ . '/../src/controllers/AdminController.php';
 
 
 $GLOBALS['pdo'] = $pdo;
@@ -81,6 +82,10 @@ $router->post('/create-checkout-session', 'CartController@createCheckoutSession'
 // stripe redirect landing pages
 $router->get('/payment/success', 'CartController@paymentSuccess');
 $router->get('/payment/cancel', 'CartController@paymentCancel');
+$router->get('/admin/dashboard', 'AdminController@adminDashboard');
+$router->get('/admin/report', 'AdminController@downloadReport');
+
+
 
 
 $router->dispatch($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);

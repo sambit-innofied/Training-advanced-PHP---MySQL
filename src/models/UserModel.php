@@ -11,7 +11,7 @@ class UserModel
 
     public function findByUsername(string $username)
     {
-        $stmt = $this->pdo->prepare("SELECT id, username, password_hash, role FROM users WHERE username = ? LIMIT 1");
+        $stmt = $this->pdo->prepare("SELECT id, username, email, password_hash, role FROM users WHERE username = ? LIMIT 1");
         $stmt->execute([$username]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }

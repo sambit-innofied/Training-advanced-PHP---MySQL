@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../models/CartModel.php';
 require_once __DIR__ . '/../models/OrderModel.php';
+require_once __DIR__ . '/../helpers/Mailer.php';
 
 class CartController
 {
@@ -341,11 +342,13 @@ class CartController
     {
         $sessionId = $_GET['session_id'] ?? null;
         if (!$sessionId) {
-            include __DIR__ . '/../views/payment/success.php';
+            // No session id - send user back to checkout with message
+            $_SESSION['checkout_error'] = 'Missing payment session. Please try again or contact support.';
+            header('Location: /checkout');
             return;
         }
 
-        \Stripe\Stripe::setApiKey($_ENV['STRIPE_SECRET_KEY']);
+        \Stripe\Stripe::setApiKey($_ENV['STRIPE_SECRET_KEY'] ?? ($_ENV['STRIPE_KEY'] ?? ''));
 
         try {
             $session = \Stripe\Checkout\Session::retrieve($sessionId);
@@ -354,15 +357,15 @@ class CartController
             $paymentStatus = $session->payment_status ?? null;
 
             if (!$orderId) {
-                $_SESSION['last_order_error'] = 'Order not found in session metadata.';
-                include __DIR__ . '/../views/payment/success.php';
+                $_SESSION['checkout_error'] = 'Order not found in payment session. Please contact support.';
+                header('Location: /checkout');
                 return;
             }
 
             if ($paymentStatus !== 'paid') {
-                // Payment not confirmed — show message, do not finalize
-                $_SESSION['last_order_error'] = 'Payment not completed (status: ' . htmlspecialchars($paymentStatus) . ').';
-                include __DIR__ . '/../views/payment/success.php';
+                // Not paid — keep order pending and send user back to checkout or show message
+                $_SESSION['checkout_error'] = 'Payment not completed (status: ' . htmlspecialchars($paymentStatus) . ').';
+                header('Location: /checkout');
                 return;
             }
 
@@ -371,9 +374,9 @@ class CartController
             try {
                 $ordersModel->finalizeOrderPayment($orderId, $paymentIntentId, $paymentStatus);
             } catch (Exception $ex) {
-                // finalization failed (e.g., insufficient stock) — show error to user
-                $_SESSION['last_order_error'] = 'Order finalization failed: ' . $ex->getMessage();
-                include __DIR__ . '/../views/payment/success.php';
+                // finalization failed (stock issue, etc.)
+                $_SESSION['checkout_error'] = 'Order finalization failed: ' . $ex->getMessage();
+                header('Location: /checkout');
                 return;
             }
 
@@ -388,15 +391,29 @@ class CartController
                 unset($_SESSION['cart']);
             }
 
+            // optional: send order confirmation email here (mailer helper)
             $_SESSION['last_order_id'] = $orderId;
+
+
+            // Call mailer only if we have a valid email
+            $toEmail = $_SESSION['email'];
+            $toName = $_SESSION['username'];
+            Mailer::sendOrderConfirmation($toEmail, $toName);
+
+            // Redirect to a proper confirmation page (recommended)
             include __DIR__ . '/../views/payment/success.php';
+
+            // Mailer::sendOrderConfirmation($_SESSION['email'], $_SESSION['username']);
             return;
+
         } catch (Exception $e) {
-            $_SESSION['last_order_error'] = 'Could not verify payment with Stripe: ' . $e->getMessage();
-            include __DIR__ . '/../views/payment/success.php';
+            // Stripe retrieval failed
+            $_SESSION['checkout_error'] = 'Could not verify payment with Stripe: ' . $e->getMessage();
+            header('Location: /checkout');
             return;
         }
     }
+
     /**
      * Cancel page (customer cancelled on Stripe). Order remains pending_payment.
      */

@@ -8,14 +8,19 @@
 </head>
 
 <body class="container py-4">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Product List</h2>
-    <div>
-      <?php if (isset($_SESSION['username'])): ?>
-        <span class="me-3">Welcome, <?= htmlspecialchars($_SESSION['username']) ?>
-          (<?= htmlspecialchars($_SESSION['role'] ?? 'customer') ?>)</span>
 
-        <?php if (isAdmin()): ?>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">Product List</h2>
+
+    <div>
+      <?php if (function_exists('isLoggedIn') && isLoggedIn()): ?>
+        <span class="me-3">Welcome, <?= htmlspecialchars($_SESSION['username'] ?? 'User') ?>
+          <small class="text-muted">(<?= htmlspecialchars($_SESSION['role'] ?? 'customer') ?>)</small>
+          <small class="text-muted">(<?= htmlspecialchars($_SESSION['email'] ?? 'cant email') ?>)</small>
+        </span>
+
+        <?php if (function_exists('isAdmin') && isAdmin()): ?>
+          <a href="/admin/dashboard" class="btn btn-primary btn-sm me-2">Dashboard</a>
           <a href="/create" class="btn btn-success btn-sm me-2">Add Product</a>
         <?php endif; ?>
 
@@ -29,57 +34,65 @@
     </div>
   </div>
 
-  <table class="table table-bordered">
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Name</th>
-        <th>Price</th>
-        <th>Type</th>
-        <th>Category</th>
-        <?php if (isAdmin()): ?>
-          <th>Actions</th>
-        <?php endif; ?>
-      </tr>
-    </thead>
-    <tbody>
-      <?php if (!empty($products)): ?>
-        <?php foreach ($products as $product): ?>
+  <div class="card mb-4">
+    <div class="card-body p-3">
+      <table class="table table-bordered mb-0">
+        <thead class="table-light">
           <tr>
-            <td><?= htmlspecialchars($product['id']) ?></td>
-            <td><?= htmlspecialchars($product['name']) ?></td>
-            <td><?= htmlspecialchars($product['price']) ?></td>
-            <td><?= htmlspecialchars($product['type']) ?></td>
-            <td><?= htmlspecialchars(string: $product['category_name'] ?? '') ?></td>
-
-            <td>
-              <form method="post" action="/cart/add" style="display:inline-block;">
-                <input type="hidden" name="product_id" value="<?= $product['id'] ?>">
-                <input type="hidden" name="quantity" value="1">
-                <button class="btn btn-sm btn-primary" type="submit">Add to cart</button>
-              </form>
-            </td>
-
-            <?php if (isAdmin()): ?>
-              <td>
-                <a href="/edit?id=<?= $product['id'] ?>" class="btn btn-warning btn-sm">Edit</a>
-                <form method="POST" action="/delete" style="display:inline-block;">
-                  <input type="hidden" name="id" value="<?= $product['id'] ?>">
-                  <button type="submit" class="btn btn-danger btn-sm"
-                    onclick="return confirm('Are you sure you want to delete this product?')">Delete</button>
-                </form>
-
-              </td>
+            <th style="width:70px">ID</th>
+            <th>Name</th>
+            <th style="width:120px">Price</th>
+            <th style="width:120px">Type</th>
+            <th>Category</th>
+            <th style="width:180px">Buy</th>
+            <?php if (function_exists('isAdmin') && isAdmin()): ?>
+              <th style="width:180px">Admin Actions</th>
             <?php endif; ?>
           </tr>
-        <?php endforeach; ?>
-      <?php else: ?>
-        <tr>
-          <td colspan="<?= isAdmin() ? '6' : '5' ?>" class="text-center">No products found</td>
-        </tr>
-      <?php endif; ?>
-    </tbody>
-  </table>
+        </thead>
+
+        <tbody>
+          <?php if (!empty($products)): ?>
+            <?php foreach ($products as $product): ?>
+              <tr>
+                <td><?= htmlspecialchars($product['id']) ?></td>
+                <td><?= htmlspecialchars($product['name']) ?></td>
+                <td><?= htmlspecialchars($product['price']) ?></td>
+                <td><?= htmlspecialchars($product['type']) ?></td>
+                <td><?= htmlspecialchars($product['category_name'] ?? '') ?></td>
+
+                <td>
+                  <form method="post" action="/cart/add" class="d-inline">
+                    <input type="hidden" name="product_id" value="<?= (int) $product['id'] ?>">
+                    <input type="hidden" name="quantity" value="1">
+                    <button class="btn btn-sm btn-primary" type="submit">Add to cart</button>
+                  </form>
+                </td>
+
+                <?php if (function_exists('isAdmin') && isAdmin()): ?>
+                  <td>
+                    <a href="/edit?id=<?= (int) $product['id'] ?>" class="btn btn-warning btn-sm me-1">Edit</a>
+
+                    <form method="POST" action="/delete" style="display:inline-block;">
+                      <input type="hidden" name="id" value="<?= (int) $product['id'] ?>">
+                      <button type="submit" class="btn btn-danger btn-sm"
+                        onclick="return confirm('Are you sure you want to delete this product?')">Delete</button>
+                    </form>
+                  </td>
+                <?php endif; ?>
+              </tr>
+            <?php endforeach; ?>
+          <?php else: ?>
+            <tr>
+              <td colspan="<?= (function_exists('isAdmin') && isAdmin()) ? '7' : '6' ?>" class="text-center">No products
+                found</td>
+            </tr>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 </body>
 
 </html>

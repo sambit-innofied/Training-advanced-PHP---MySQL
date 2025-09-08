@@ -1,0 +1,1 @@
+{"version":2,"defects":{"OrderTest::testOrderProcessing":8,"ProductTest::testProductCreation":8,"UserTest::testUserRegistration":8},"times":{"OrderTest::testOrderProcessing":0.003,"ProductTest::testProductCreation":0.003,"UserTest::testUserRegistration":0.062}}
