@@ -33,7 +33,6 @@ class Router
             return;
         }
 
-        // if callback is callable (closure or [class, method]) call it
         if (is_callable($callback)) {
             call_user_func($callback);
         } else {

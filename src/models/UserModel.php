@@ -2,42 +2,31 @@
 
 class UserModel
 {
-    protected $pdo;
+    private ?int $id;
+    private string $username;
+    private string $email;
+    private string $passwordHash;
+    private string $role;
 
-    public function __construct(PDO $pdo)
+    public function __construct(?int $id, string $username, string $email, string $passwordHash, string $role = 'customer')
     {
-        $this->pdo = $pdo;
+        $this->id = $id;
+        $this->username = $username;
+        $this->email = $email;
+        $this->passwordHash = $passwordHash;
+        $this->role = $role;
     }
 
-    public function findByUsername(string $username)
-    {
-        $stmt = $this->pdo->prepare("SELECT id, username, email, password_hash, role FROM users WHERE username = ? LIMIT 1");
-        $stmt->execute([$username]);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    }
+    public function getId(): ?int { return $this->id; }
+    public function getUsername(): string { return $this->username; }
+    public function setUsername(string $username): void { $this->username = $username; }
 
-    public function findById(int $id)
-    {
-        $stmt = $this->pdo->prepare("SELECT id, username, email, role, created_at FROM users WHERE id = ? LIMIT 1");
-        $stmt->execute([$id]);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    }
+    public function getEmail(): string { return $this->email; }
+    public function setEmail(string $email): void { $this->email = $email; }
 
+    public function getPasswordHash(): string { return $this->passwordHash; }
+    public function setPasswordHash(string $passwordHash): void { $this->passwordHash = $passwordHash; }
 
-    public function existsByUsernameOrEmail(string $username, string $email): bool
-    {
-        $stmt = $this->pdo->prepare("SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1");
-        $stmt->execute([$username, $email]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        return (bool) $row;
-    }
-
-
-    // Create a new user.
-    public function create(string $username, string $email, string $password_hash, string $role = 'customer')
-    {
-        $stmt = $this->pdo->prepare("INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)");
-        $stmt->execute([$username, $email, $password_hash, $role]);
-        return $this->pdo->lastInsertId();
-    }
+    public function getRole(): string { return $this->role; }
+    public function setRole(string $role): void { $this->role = $role; }
 }

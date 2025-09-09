@@ -1,6 +1,6 @@
 <?php
 
-require_once __DIR__ . '/../models/UserModel.php';
+require_once __DIR__ . '/../repositories/UserRepository.php';
 
 class AuthController
 {
@@ -10,7 +10,7 @@ class AuthController
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
-        $this->userModel = new UserModel($pdo);
+        $this->userModel = new UserRepository($pdo);
     }
 
     // Show login form
@@ -50,15 +50,15 @@ class AuthController
             exit;
         }
 
-        // Check user credentials via model
+        // Check user credentials via repository
         $user = $this->userModel->findByUsername($username);
 
-        if ($user && password_verify($password, $user['password_hash'])) {
-            // Set session variables
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['email'] = $user['email'];
-            $_SESSION['role'] = $user['role']; // Store the role
+        if ($user && password_verify($password, $user->getPasswordHash())) {
+            // Set session variables using the entity getters
+            $_SESSION['user_id'] = $user->getId();
+            $_SESSION['username'] = $user->getUsername();
+            $_SESSION['email'] = $user->getEmail();
+            $_SESSION['role'] = $user->getRole(); // Store the role
             $_SESSION['logged_in'] = true;
 
             // Redirect to home page
@@ -138,7 +138,7 @@ class AuthController
             $errors['password_confirm'] = 'Passwords do not match.';
         }
 
-        // Check if username or email already exists via model
+        // Check if username or email already exists via repository
         if (!$errors) {
             if ($this->userModel->existsByUsernameOrEmail($username, $email)) {
                 $errors['general'] = 'Username or email already exists.';
@@ -152,12 +152,14 @@ class AuthController
             exit;
         }
 
-        // Hash password and create user using model
+        // Hash password and create user using repository (pass entity)
         $password_hash = password_hash($password, PASSWORD_DEFAULT);
         $defaultRole = 'customer';
 
         try {
-            $user_id = $this->userModel->create($username, $email, $password_hash, $defaultRole);
+            // Create entity and pass to repository create()
+            $newUserEntity = new UserModel(null, $username, $email, $password_hash, $defaultRole);
+            $user_id = $this->userModel->create($newUserEntity);
         } catch (Exception $e) {
             // If DB error occurs, show generic message (preserve behavior)
             $_SESSION['register_errors'] = ['general' => 'Failed to create user: ' . $e->getMessage()];
