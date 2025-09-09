@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../models/ProductModel.php';
+require_once __DIR__ . '/../repositories/ProductRepository.php';
 require_once __DIR__ . '/../validation/ProductValidator.php';
 
 class ProductController
@@ -10,13 +10,17 @@ class ProductController
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
-        $this->productModel = new ProductModel($pdo);
+        $this->productModel = new ProductRepository($pdo);
     }
 
-    //Get all products (index)
+    // Get all products (index)
     public function index()
     {
-        $products = $this->productModel->all();
+        // repository returns entity objects; map them to arrays for views (preserve previous behavior
+        $entities = $this->productModel->all();
+        $products = array_map(function ($entity) {
+            return $entity->toArray();
+        }, $entities);
 
         // Check if user is admin
         isAdmin();
@@ -64,11 +68,19 @@ class ProductController
             $old['download_url'] = trim($_POST['download_url']);
         }
 
-        // Prepare data array for model
-        $data = array_merge($old, ['name' => $name, 'price' => $price, 'type' => $type, 'category_id' => $category_id]);
+        // Create appropriate entity and pass to repository
+        if ($type === 'physical') {
+            $productEntity = new PhysicalProductModel(null, $name, $price, 'physical', $category_id);
+            $productEntity->setWeight($old['weight']);
+            $productEntity->setDimensions($old['dimensions']);
+        } else {
+            $productEntity = new DigitalProductModel(null, $name, $price, 'digital', $category_id);
+            $productEntity->setFileSize($old['file_size']);
+            $productEntity->setDownloadUrl($old['download_url']);
+        }
 
         try {
-            $this->productModel->create($data);
+            $this->productModel->create($productEntity);
 
             header('Location: /');
             exit;
@@ -87,33 +99,32 @@ class ProductController
         }
         $id = (int) $id;
 
-        // fetch product
-        $product = $this->productModel->find($id);
+        // fetch product entity
+        $productEntity = $this->productModel->find($id);
 
-        if (!$product) {
+        if (!$productEntity) {
             header('Location: /');
             exit;
         }
 
-        // build old values to populate the form
+        // build old values to populate the form (preserve previous array keys)
+        $base = $productEntity->toArray();
+
         $old = [
             'id' => $id,
-            'name' => $product['name'],
-            'price' => $product['price'],
-            'type' => $product['type'],
-            'category_id' => $product['category_id']
+            'name' => $base['name'],
+            'price' => $base['price'],
+            'type' => $base['type'],
+            'category_id' => $base['category_id']
         ];
 
-        // fetch subtype fields
-        $sub = $this->productModel->getSubtype($id, $product['type']);
-        if (!empty($sub)) {
-            if ($product['type'] === 'physical') {
-                $old['weight'] = $sub['weight'];
-                $old['dimensions'] = $sub['dimensions'];
-            } else {
-                $old['file_size'] = $sub['file_size'];
-                $old['download_url'] = $sub['download_url'];
-            }
+        // subtype fields (toArray on subtype includes them if present)
+        if ($base['type'] === 'physical') {
+            $old['weight'] = $base['weight'] ?? '';
+            $old['dimensions'] = $base['dimensions'] ?? '';
+        } else {
+            $old['file_size'] = $base['file_size'] ?? '';
+            $old['download_url'] = $base['download_url'] ?? '';
         }
 
         // load categories
@@ -137,33 +148,32 @@ class ProductController
         $errors = ProductValidator::validate($this->pdo, $_POST);
 
         if (!empty($errors)) {
-            // Fetch the product and its subtype data to populate the form
-            $product = $this->productModel->find($id);
+            // Fetch the product entity to populate the form
+            $productEntity = $this->productModel->find($id);
 
-            if (!$product) {
+            if (!$productEntity) {
                 header('Location: /');
                 exit;
             }
 
-            // Build old values to populate the form
+            $base = $productEntity->toArray();
+
+            // Build old values to populate the form (prefer POST values)
             $old = [
                 'id' => $id,
-                'name' => $_POST['name'] ?? $product['name'],
-                'price' => $_POST['price'] ?? $product['price'],
-                'type' => $_POST['type'] ?? $product['type'],
-                'category_id' => $_POST['category_id'] ?? $product['category_id']
+                'name' => $_POST['name'] ?? $base['name'],
+                'price' => $_POST['price'] ?? $base['price'],
+                'type' => $_POST['type'] ?? $base['type'],
+                'category_id' => $_POST['category_id'] ?? $base['category_id']
             ];
 
-            // Add subtype fields (read from DB if not present in POST)
-            $sub = $this->productModel->getSubtype($id, $product['type']);
-            if (!empty($sub)) {
-                if (($product['type'] ?? '') === 'physical') {
-                    $old['weight'] = $_POST['weight'] ?? $sub['weight'];
-                    $old['dimensions'] = $_POST['dimensions'] ?? $sub['dimensions'];
-                } else {
-                    $old['file_size'] = $_POST['file_size'] ?? $sub['file_size'];
-                    $old['download_url'] = $_POST['download_url'] ?? $sub['download_url'];
-                }
+            // Add subtype fields (read from entity if not present in POST)
+            if (($base['type'] ?? '') === 'physical') {
+                $old['weight'] = $_POST['weight'] ?? ($base['weight'] ?? '');
+                $old['dimensions'] = $_POST['dimensions'] ?? ($base['dimensions'] ?? '');
+            } else {
+                $old['file_size'] = $_POST['file_size'] ?? ($base['file_size'] ?? '');
+                $old['download_url'] = $_POST['download_url'] ?? ($base['download_url'] ?? '');
             }
 
             // Load categories for the form
@@ -180,31 +190,24 @@ class ProductController
         $type = $_POST['type'];
         $category_id = (int) $_POST['category_id'];
 
-        // Prepare data for transaction
-        $updateData = [
-            'name' => $name,
-            'price' => $price,
-            'type' => $type,
-            'category_id' => $category_id,
-            'id' => $id
-        ];
-
-        // Add subtype data
+        // Prepare entity for update (id must be present)
         if ($type === 'physical') {
-            $updateData['weight'] = trim($_POST['weight']);
-            $updateData['dimensions'] = trim($_POST['dimensions']);
+            $entity = new PhysicalProductModel($id, $name, $price, 'physical', $category_id);
+            $entity->setWeight(trim($_POST['weight']));
+            $entity->setDimensions(trim($_POST['dimensions']));
         } else {
-            $updateData['file_size'] = trim($_POST['file_size']);
-            $updateData['download_url'] = trim($_POST['download_url']);
+            $entity = new DigitalProductModel($id, $name, $price, 'digital', $category_id);
+            $entity->setFileSize(trim($_POST['file_size']));
+            $entity->setDownloadUrl(trim($_POST['download_url']));
         }
 
         try {
-            $this->productModel->update($id, $updateData);
+            $this->productModel->update($entity);
 
             header('Location: /');
             exit;
         } catch (Exception $e) {
-            // Prepare data for error display
+            // Prepare data for error display (preserve previous behavior)
             $old = [
                 'id' => $id,
                 'name' => $name,
@@ -215,11 +218,11 @@ class ProductController
 
             // Add subtype data
             if ($type === 'physical') {
-                $old['weight'] = $updateData['weight'];
-                $old['dimensions'] = $updateData['dimensions'];
+                $old['weight'] = $entity->getWeight();
+                $old['dimensions'] = $entity->getDimensions();
             } else {
-                $old['file_size'] = $updateData['file_size'];
-                $old['download_url'] = $updateData['download_url'];
+                $old['file_size'] = $entity->getFileSize();
+                $old['download_url'] = $entity->getDownloadUrl();
             }
 
             // Show error in form
