@@ -398,7 +398,7 @@ class CartController
             // Call mailer only if we have a valid email
             $toEmail = $_SESSION['email'];
             $toName = $_SESSION['username'];
-            Mailer::sendOrderConfirmation($toEmail, $toName);
+            Mailer::sendOrderConfirmation($toEmail, $toName, $orderId);
 
             // Redirect to a proper confirmation page (recommended)
             include __DIR__ . '/../views/payment/success.php';
