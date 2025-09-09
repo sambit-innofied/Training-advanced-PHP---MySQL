@@ -1,36 +1,33 @@
 <?php
 require_once __DIR__ . '/../models/CartModel.php';
+require_once __DIR__ . '/../repositories/CartRepository.php';
 require_once __DIR__ . '/../models/OrderModel.php';
 require_once __DIR__ . '/../helpers/Mailer.php';
 
 class CartController
 {
     protected $pdo;
-    protected $cartModel;
+    protected $cartRepository;
 
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
-        $this->cartModel = new CartModel($pdo);
+        $this->cartRepository = new CartRepository($pdo);
     }
 
-    // show cart
     public function index()
     {
-        // Determine cart ID: if logged in, fetch DB cart; otherwise use session cart
         if (isset($_SESSION['user_id'])) {
-            $cartId = $this->cartModel->getCartIdForUser((int) $_SESSION['user_id']);
-            $items = $cartId ? $this->cartModel->getCartItems($cartId) : [];
+            $cartId = $this->cartRepository->getCartIdForUser((int) $_SESSION['user_id']);
+            $items = $cartId ? $this->cartRepository->getCartItems($cartId) : [];
         } else {
             $sessionCart = $_SESSION['cart'] ?? [];
-            // session items are [ ['product_id'=>x,'quantity'=>y], ... ]
             $items = [];
             foreach ($sessionCart as $it) {
-                // fetch product details for each product_id
                 $stmt = $this->pdo->prepare("
-                        SELECT p.id AS product_id, p.name, p.price, p.type, c.name AS category_name
-                        FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ? LIMIT 1
-                    ");
+                    SELECT p.id AS product_id, p.name, p.price, p.type, c.name AS category_name
+                    FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ? LIMIT 1
+                ");
                 $stmt->execute([(int) $it['product_id']]);
                 $row = $stmt->fetch(PDO::FETCH_ASSOC);
                 if ($row) {
@@ -44,7 +41,6 @@ class CartController
         include __DIR__ . '/../views/cart/index.php';
     }
 
-    // add to cart
     public function add()
     {
         $productId = (int) ($_POST['product_id'] ?? 0);
@@ -55,19 +51,18 @@ class CartController
             exit;
         }
 
-        // If user logged in -> use DB cart
         if (isset($_SESSION['user_id'])) {
-            $cartId = $this->cartModel->getOrCreateCartForUser((int) $_SESSION['user_id']);
-            $this->cartModel->addItem($cartId, $productId, $quantity, false);
+            $cartId = $this->cartRepository->getOrCreateCartForUser((int) $_SESSION['user_id']);
+            $this->cartRepository->addItem($cartId, $productId, $quantity, false);
         } else {
-            // Guest: use session cart (simple array of items)
-            if (!isset($_SESSION['cart']))
+            if (!isset($_SESSION['cart'])) {
                 $_SESSION['cart'] = [];
-            // find if exists
+            }
+
             $found = false;
             foreach ($_SESSION['cart'] as &$it) {
                 if ((int) $it['product_id'] === $productId) {
-                    $it['quantity'] = (int) $it['quantity'] + $quantity;
+                    $it['quantity'] += $quantity;
                     $found = true;
                     break;
                 }
@@ -81,7 +76,6 @@ class CartController
         exit;
     }
 
-    // update quantity (POST: product_id, quantity)
     public function update()
     {
         $productId = (int) ($_POST['product_id'] ?? 0);
@@ -93,28 +87,26 @@ class CartController
         }
 
         if (isset($_SESSION['user_id'])) {
-            $cartId = $this->cartModel->getOrCreateCartForUser((int) $_SESSION['user_id']);
-            $this->cartModel->addItem($cartId, $productId, $quantity, true); // set quantity
+            $cartId = $this->cartRepository->getOrCreateCartForUser((int) $_SESSION['user_id']);
+            $this->cartRepository->addItem($cartId, $productId, $quantity, true);
         } else {
             if (!isset($_SESSION['cart'])) {
                 $_SESSION['cart'] = [];
             }
 
             if ($quantity <= 0) {
-                // Remove item (works even if it's the last one)
                 $_SESSION['cart'] = array_values(array_filter(
                     $_SESSION['cart'],
                     fn($it) => (int) $it['product_id'] !== $productId
                 ));
             } else {
-                // Update quantity
                 foreach ($_SESSION['cart'] as &$it) {
                     if ((int) $it['product_id'] === $productId) {
                         $it['quantity'] = $quantity;
                         break;
                     }
                 }
-                unset($it); // break reference
+                unset($it);
             }
         }
 
@@ -122,7 +114,6 @@ class CartController
         exit;
     }
 
-    // remove item
     public function delete()
     {
         $productId = (int) ($_POST['product_id'] ?? 0);
@@ -132,13 +123,14 @@ class CartController
         }
 
         if (isset($_SESSION['user_id'])) {
-            $cartId = $this->cartModel->getCartIdForUser((int) $_SESSION['user_id']);
+            $cartId = $this->cartRepository->getCartIdForUser((int) $_SESSION['user_id']);
             if ($cartId) {
-                $this->cartModel->removeItem($cartId, $productId);
+                $this->cartRepository->removeItem($cartId, $productId);
             }
         } else {
-            if (!isset($_SESSION['cart']))
+            if (!isset($_SESSION['cart'])) {
                 $_SESSION['cart'] = [];
+            }
             foreach ($_SESSION['cart'] as $k => $it) {
                 if ((int) $it['product_id'] === $productId) {
                     unset($_SESSION['cart'][$k]);
@@ -154,12 +146,17 @@ class CartController
 
     public function checkout()
     {
-        // Build items array like in index()
         if (isset($_SESSION['user_id'])) {
-            $items = $this->cartModel->getCartItems($this->cartModel->getCartIdForUser((int) $_SESSION['user_id']) ?? 0);
-            // normalize items to expected format (product_id, quantity, price)
+            $cartId = $this->cartRepository->getCartIdForUser((int) $_SESSION['user_id']);
+            $items = $this->cartRepository->getCartItems($cartId ?? 0);
+
             $cartItems = array_map(function ($r) {
-                return ['product_id' => (int) $r['product_id'], 'quantity' => (int) $r['quantity'], 'price' => $r['price'], 'name' => $r['name']];
+                return [
+                    'product_id' => (int) $r['product_id'],
+                    'quantity' => (int) $r['quantity'],
+                    'price' => $r['price'],
+                    'name' => $r['name']
+                ];
             }, $items);
         } else {
             $sessionCart = $_SESSION['cart'] ?? [];
@@ -177,6 +174,7 @@ class CartController
 
         include __DIR__ . '/../views/cart/checkout.php';
     }
+
 
     // Place order (POST) — used for Cash-On-Delivery / immediate non-Stripe flows
     public function placeOrder()
@@ -220,7 +218,7 @@ class CartController
 
             // 3) clear cart
             if (isset($_SESSION['user_id'])) {
-                $cartId = $this->cartModel->getCartIdForUser((int) $_SESSION['user_id']);
+                $cartId = $this->cartRepository->getCartIdForUser((int) $_SESSION['user_id']);
                 if ($cartId) {
                     $stmt = $this->pdo->prepare("DELETE FROM cart_items WHERE cart_id = ?");
                     $stmt->execute([$cartId]);
@@ -382,7 +380,7 @@ class CartController
 
             // clear cart after successful finalization
             if (isset($_SESSION['user_id'])) {
-                $cartId = $this->cartModel->getCartIdForUser((int) $_SESSION['user_id']);
+                $cartId = $this->cartRepository->getCartIdForUser((int) $_SESSION['user_id']);
                 if ($cartId) {
                     $stmt = $this->pdo->prepare("DELETE FROM cart_items WHERE cart_id = ?");
                     $stmt->execute([$cartId]);
